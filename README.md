@@ -16,7 +16,7 @@ Capstone Project I at Constructor University, partnered with the **MariaDB Found
 
 ## MariaDB version
 
-`mariadb --version` output goes here once installed (filled in during setup).
+**12.3.3-MariaDB** (Windows build). Installed locally via `winget install --id MariaDB.Server`.
 
 ## Dataset
 
@@ -25,7 +25,7 @@ The starter and main-dish SQL examples use small, self-generated sample data def
 ## Repository layout
 
 ```
-docs/                    reading summary, project shortlist, contributor setup guide
+docs/                    reading summary, project shortlist
 self_assessment/         weekly self-assessment (one file per week)
 sql/                     MariaDB example scripts, one per contributor
 AI_USE_LOG.md            traceable record of AI tool use

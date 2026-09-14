@@ -18,3 +18,6 @@ data/
 # professor's course materials, not ours to redistribute.
 todo_cp_01.pdf
 team_guide.pdf
+
+# Contributor walkthrough kept local only -- shared directly, not committed.
+docs/CONTRIBUTOR_SETUP.md
