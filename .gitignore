@@ -1,0 +1,20 @@
+# OS
+Thumbs.db
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# MariaDB local data/logs (don't commit database files)
+*.err
+*.pid
+data/
+
+# Env/secrets
+.env
+
+# Course PDFs kept local only -- this repo goes public, and these are the
+# professor's course materials, not ours to redistribute.
+todo_cp_01.pdf
+team_guide.pdf
