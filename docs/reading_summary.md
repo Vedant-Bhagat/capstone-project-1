@@ -37,4 +37,4 @@ Summary of the sources required for To-do 01. Both of us should still skim the o
 
 See `sql/` for the runnable scripts and their inline explanations. Summarized:
 - `sql/vedant_example.sql` — see file header for what it demonstrates and how to run it.
-- `sql/janhavi_example.sql` — to be added by Janhavi (template and instructions in `docs/CONTRIBUTOR_SETUP.md`).
+- `sql/janhavi_example.sql` — `WEIGHTED_AVERAGE(value, weight)`, a two-argument custom aggregate function (see file header for how to run it).

@@ -1,6 +1,6 @@
-# capstone-project-1 — Capstone I (MariaDB)
+# Team Aggregate — Capstone I (MariaDB)
 
-> **Rename if you pick a different team name with Janhavi.** To rename later:
+> Team name: **Team Aggregate** (confirmed by Janhavi; nods to the custom-aggregate-function starter). If Vedant wants to change it, rename here:
 > 1. Rename the GitHub repo (Settings → repository name).
 > 2. Update the title on the line above.
 > 3. Update the local `origin` remote if the repo URL changes: `git remote set-url origin <new-url>`.
@@ -12,7 +12,7 @@ Capstone Project I at Constructor University, partnered with the **MariaDB Found
 | Name | GitHub |
 |---|---|
 | Vedant | `vedant.work543` account |
-| Janhavi | _add GitHub username_ |
+| Janhavi | `janhavi8112` |
 
 ## MariaDB version
 
