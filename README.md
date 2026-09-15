@@ -1,6 +1,6 @@
-# Team Aggregate — Capstone I (MariaDB)
+# Golden Record — Capstone I (MariaDB)
 
-> Team name: **Team Aggregate** (confirmed by Janhavi; nods to the custom-aggregate-function starter). If Vedant wants to change it, rename here:
+> Team name: **Golden Record** (confirmed by Janhavi — a "golden record" is the single, authoritative, trusted master version of a piece of data, a fitting name for a database team). If Vedant wants to change it, rename here:
 > 1. Rename the GitHub repo (Settings → repository name).
 > 2. Update the title on the line above.
 > 3. Update the local `origin` remote if the repo URL changes: `git remote set-url origin <new-url>`.
