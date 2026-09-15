@@ -12,7 +12,7 @@ Capstone Project I at Constructor University, partnered with the **MariaDB Found
 | Name | GitHub |
 |---|---|
 | Vedant | `vedant.work543` account |
-| Janhavi | _add GitHub username_ |
+| Janhavi | `janhavi8112` |
 
 ## MariaDB version
 
