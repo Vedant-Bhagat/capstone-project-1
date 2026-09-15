@@ -11,7 +11,7 @@ Both the starter and the main dish are picked from the professor's approved list
 | **Custom aggregate functions** ✅ leaning towards this | `CREATE AGGREGATE FUNCTION ... FETCH GROUP NEXT ROW` — write your own SQL-level aggregate (median, mode, geometric mean, weighted percentile, longest streak, etc.). Not available at the SQL level in MySQL, so it's a clean "something only MariaDB has." | Small, contained, easy to demo before/after (aggregate function vs. window function vs. correlated subquery vs. app-side loop), with measurable query length/readability/execution-time differences. Good scope for a starter. |
 | SQL features that save code | Demonstrate ≥2 of: `INET4`/`INET6`, `UUID`, `RETURNING`, `CREATE SEQUENCE`, `INTERSECT`/`EXCEPT`, `CREATE OR REPLACE`, `IS JSON`, invisible columns, `ROW` types, instant column changes, global temp tables, `UPDATE`/`DELETE` with CTEs. | Also a solid, low-effort starter — broader surface (many small features) rather than one focused feature. Kept as backup if the aggregate-function angle turns out too thin. |
 
-**Decision**: confirm with Janhavi, but custom aggregate functions gives a tighter, more demoable starter for two people in limited time.
+**Decision**: confirmed with Janhavi — custom aggregate functions is the starter (both contributors' SQL examples in `sql/` implement it: `GEOMETRIC_MEAN` and `WEIGHTED_AVERAGE`).
 
 ## Main dish (pick one) — shortlisted, in order of preference
 
