@@ -2,7 +2,11 @@
 
 Source: MariaDB Foundation project list, https://mariadb.org/bachelor_hackathon_2026-09/ (list may change during the semester — re-check before finalizing).
 
-Both the starter and the main dish are picked from the professor's approved list (`todo_cp_01.pdf` / `team_guide.pdf`). With a 2-person team, we favored **Tier A/B projects** (single local server) over Tier C–E (external systems, multi-server clusters, C/C++ plugin toolchains) — those need more infrastructure and specialist setup than we can reliably support with two contributors.
+Both the starter and the main dish are picked from the professor's approved list (`todo_cp_01.pdf` / `team_guide.pdf`).
+
+Our shortlist reflects two different bets, and we are choosing between them deliberately:
+- **Safety of delivery** — a self-contained Tier A/B project (single local server) that two contributors can reliably finish and demo.
+- **Real external contribution** — work that produces a merged pull request in a real open-source project, at the cost of a scope we cannot size upfront.
 
 ## Starter (pick one) — leaning: **Custom Aggregate Functions**
 
@@ -13,12 +17,39 @@ Both the starter and the main dish are picked from the professor's approved list
 
 **Decision**: confirmed with Janhavi — custom aggregate functions is the starter (both contributors' SQL examples in `sql/` implement it: `GEOMETRIC_MEAN` and `WEIGHTED_AVERAGE`).
 
-## Main dish (pick one) — shortlisted, in order of preference
+## Main dish (pick one) — shortlisted
 
-1. **System-versioned tables** — `WITH SYSTEM VERSIONING`, queried via `FOR SYSTEM_TIME AS OF / BETWEEN / ALL` (SQL:2011, built into the server). Suggested build: a "Wikipedia article time machine" using revision-history data, letting a reader view/compare article versions at chosen timestamps. **Why**: Tier A (single local server, most approachable), strong narrative, clear before/after story, and a well-defined design decision to document (how historical dates are represented) — good fit for a first main dish.
-2. **Storage-engine choice** — benchmark one dataset/workload across ≥3 engines (InnoDB, Aria, MyRocks, ...): load time, disk size, point-lookup latency, full scan, concurrent writes, crash recovery. **Why**: Tier B, pure measurement/engineering rigor, no exotic setup — good if we want a project that's more about disciplined benchmarking than a single clever feature.
-3. **The optimizer, opened up** — compare `EXPLAIN` vs `ANALYZE SELECT`, show histogram/cost-setting effects, find and explain a case where the optimizer picks badly. **Why**: Tier B, high depth, but needs solid query-plan literacy going in — higher risk if we're not already comfortable reading plans.
+### 1. Ecosystem compatibility (contribute upstream) — Tier C
 
-**Not shortlisted**: *Online schema change* (viable but overlaps heavily with storage-engine benchmarking work), *Write a server plugin* (requires a C/C++ toolchain and server headers — steep ramp-up for a 2-person team on a tight schedule), *Ecosystem compatibility* (requires deep-diving an external codebase before we even know the scope — harder to size upfront).
+Pick an open-source project not yet verified against MariaDB (Drupal, Nextcloud, Moodle, Matomo — *not* WordPress, which the project page indicates is already well covered), run its test suite against MariaDB, diagnose every failure, fix the MySQL assumptions, and additionally add a capability using a MariaDB-only feature the project does not currently use. Submit upstream.
 
-**Decision**: bring options 1–3 to the meeting; System-versioned tables is the current lead.
+**Why we want it**: it is the only option on the list that produces a contribution to a real external project rather than a self-contained demo repository, and it is the most direct fit for this semester's Open Source theme. It also gives MariaDB something they do not already have — evidence of where their database breaks in real applications.
+
+**Where the code lands**: in the chosen project's repository (Drupal, Nextcloud, etc.), **not** in MariaDB's codebase. MariaDB benefits indirectly through wider ecosystem support.
+
+**The structural tension to design around**: the two mandated halves pull against each other. Compatibility fixes are highly mergeable but score nothing on "MariaDB depth." Adding a MariaDB-only capability scores well on depth but is hard to merge into a project that also supports PostgreSQL and SQLite, because maintainers reject changes that fragment their support matrix. Our plan is to split the deliverable: **compatibility fixes go upstream** (the contribution), **the MariaDB-capability work lives in our own repository** as a documented proof-of-concept with measurements (the depth artifact). Neither half is then hostage to the other.
+
+**Known risks**: scope cannot be sized until we clone a candidate and run its test suite (a scouting phase must come first); upstream acceptance is outside our control and review cycles are slow; Tier C means reading a large unfamiliar PHP codebase. Mitigation: the graded deliverable is "test results, diagnosis, patch" — not the merge — so a rigorous writeup scores even if a maintainer sits on the pull request.
+
+### 2. System-versioned tables — Tier A
+
+`WITH SYSTEM VERSIONING`, queried via `FOR SYSTEM_TIME AS OF / BETWEEN / ALL` (SQL:2011, built into the server). Suggested build: a "Wikipedia article time machine" using revision-history data, letting a reader view and compare article versions at chosen timestamps.
+
+**Why**: the safe alternative. Most approachable tier, strong demo narrative, clear before/after story, and a well-defined design decision to document (how historical dates are represented). Produces a portfolio repository rather than an external contribution.
+
+### 3. Storage-engine choice — Tier B
+
+Benchmark one dataset and workload across ≥3 engines (InnoDB, Aria, MyRocks, ...): load time, disk size, point-lookup latency, full scan, concurrent writes, crash recovery.
+
+**Why**: pure measurement and engineering rigor, no exotic setup. A good fallback if we want disciplined benchmarking rather than a single feature.
+
+**Not shortlisted**: *The optimizer* (high depth but needs strong query-plan literacy going in), *Online schema change* (viable, but overlaps heavily with storage-engine benchmarking), *Write a server plugin* (C/C++ toolchain and server headers — steep ramp-up for two contributors, though it is the closest option to real MariaDB engineering).
+
+## Open decision
+
+Options 1 and 2 are genuinely different bets, and we have not committed yet. Two things resolve it:
+
+1. **Ask the MariaDB Foundation** which ecosystem projects they consider unverified and would most want covered — a project they name is far likelier to be accepted upstream than one we pick blindly.
+2. **Run a scouting pass** on the named candidate: stand up its test environment, point it at MariaDB 12.3.3, run its suite, and count and categorise the failures. Roughly 30–60 genuine failures suggests a well-sized project; very few means too thin, very many means deep MySQL assumptions and we walk away.
+
+If scouting shows the scope is unmanageable, we fall back to System-versioned tables.
