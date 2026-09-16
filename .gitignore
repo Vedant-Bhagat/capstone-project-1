@@ -17,6 +17,7 @@ data/
 # Course PDFs kept local only -- this repo goes public, and these are the
 # professor's course materials, not ours to redistribute.
 todo_cp_01.pdf
+todo_cp_02.pdf
 team_guide.pdf
 
 # Contributor walkthrough kept local only -- shared directly, not committed.
