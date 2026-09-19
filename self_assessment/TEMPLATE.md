@@ -19,3 +19,12 @@ Fill one copy of this per week (copy to `self_assessment/YYYY-MM-DD.md`, dated f
 - **Plan for next week:**
 - **AI tools used this week:**
 - **Notes / blockers:**
+
+## Pranesh
+
+- **Work done this week:**
+- **Hours spent:**
+- **Commit/PR links:**
+- **Plan for next week:**
+- **AI tools used this week:**
+- **Notes / blockers:**
