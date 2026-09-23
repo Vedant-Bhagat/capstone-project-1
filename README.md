@@ -10,6 +10,7 @@ Capstone Project I at Constructor University, partnered with the **MariaDB Found
 |---|---|
 | Vedant | `vedant.work543` account |
 | Janhavi | `janhavi8112` |
+| Pranesh | `Pranesh-Navneeth` |
 
 ## MariaDB version
 

@@ -7,6 +7,7 @@ Sessions referenced below:
 - **S2** — Claude Code (CLI), Janhavi, 2026-09-16: local CLI session, no shareable web link.
 - **S3** — Claude Code (Opus 5), Vedant, 2026-09-16: https://claude.ai/code/session_01SKpAmxHBFJND6pTkajp9pT
 - **S4** — Claude Code (Opus 5), Vedant, 2026-09-19: https://claude.ai/code/session_01FcRqx9zst5MMVEWhSRuAaR
+- **S5** — Claude (chat), Pranesh, 2026-09-23: https://claude.ai/chat/273fea3f-3431-4e6d-a0cc-3987e47995d1
 
 | Date | Contributor | Tool | Part touched | Prompt / session | Output |
 |---|---|---|---|---|---|
@@ -19,3 +20,4 @@ Sessions referenced below:
 | 2026-09-16 | Vedant | Claude Code (Opus 5) | `docs/project_shortlist.md` — added Ecosystem compatibility as a main-dish candidate, restructured the shortlist around the delivery-safety vs. external-contribution trade-off, and recorded the open decision and scouting plan | S3 — discussion of which main dish best supports a real open-source contribution; asked to add the ecosystem option to the shortlist | commit `5551c6d` |
 | 2026-09-19 | Vedant | Claude Code (Opus 5) | `self_assessment/TEMPLATE.md` — added a section for Pranesh, the third team member, in the same format as the existing contributors | S4 — "add his section in the self assessment template with the same format" | commit `1439837` |
 | 2026-09-21 | Vedant | Claude Code (Opus 5) | `docs/project_shortlist.md` — recorded what the 17.09 MariaDB Q&A settled, decided Vector Search and RAG as the main dish, kept System-versioned tables as fallback, and documented why Ecosystem compatibility was rejected | S4 — analysis of the meeting transcript against our open questions, then asked to decide and update the shortlist | commit `a02a85c` |
+| 2026-09-23 | Pranesh | Claude (chat) | `sql/pranesh_example.sql` (`HARMONIC_MEAN` custom aggregate, run against local MariaDB 13.0.2 before committing); README team table; `docs/reading_summary.md` entry; self-assessment for 2026-09-22 | S5 — onboarding as a late-joining contributor: git and MariaDB setup guidance, and drafting the harmonic-mean aggregate example | commits `92ce996`, `7e7eb90`, `499f492`, `2051e4c`, `a4e53c9` |
