@@ -38,3 +38,4 @@ Summary of the sources required for To-do 01. Both of us should still skim the o
 See `sql/` for the runnable scripts and their inline explanations. Summarized:
 - `sql/vedant_example.sql` — see file header for what it demonstrates and how to run it.
 - `sql/janhavi_example.sql` — `WEIGHTED_AVERAGE(value, weight)`, a two-argument custom aggregate function (see file header for how to run it).
+- `sql/pranesh_example.sql` — `HARMONIC_MEAN` custom aggregate function, the correct way to average speeds over equal distances; compared against the inline formula (matches exactly) and against plain `AVG()` (gives the wrong, higher answer).
