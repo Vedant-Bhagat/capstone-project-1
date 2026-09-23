@@ -10,7 +10,7 @@ Capstone Project I at Constructor University, partnered with the **MariaDB Found
 |---|---|
 | Vedant | `vedant.work543` account |
 | Janhavi | `janhavi8112` |
-
+| Pranesh | `Pranesh-Navneeth`   |
 ## MariaDB version
 
 **12.3.3-MariaDB** (Windows x64 build). Every script in `sql/` was written and verified against this version.
