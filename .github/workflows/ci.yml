@@ -1,0 +1,73 @@
+name: SQL examples
+
+# Loads the OpenFlights dataset into a clean MariaDB, runs every example
+# script, and runs the aggregate function tests. The matrix covers the
+# versions the team actually develops on (12.3 and 13.0) plus the current
+# long-term support release, so a change that only works on one of them fails
+# here rather than on somebody's laptop.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        mariadb: ['11.4', '12.3', '13.0']
+
+    services:
+      mariadb:
+        image: mariadb:${{ matrix.mariadb }}
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      MYSQL_PWD: ci-root-password
+      CLIENT: mariadb -h 127.0.0.1 -P 3306 --protocol=tcp -u root
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MariaDB client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mariadb-client
+
+      - name: Report server version
+        run: $CLIENT -e "SELECT VERSION();"
+
+      - name: Fetch the OpenFlights dataset
+        run: git clone --depth 1 https://github.com/mariadb/openflights.git
+
+      - name: Load the dataset
+        working-directory: openflights
+        run: |
+          $CLIENT < sql/create.sql
+          $CLIENT --local-infile=1 < sql/load-data.sql
+
+      - name: Create the derived view
+        run: $CLIENT < sql/setup_dataset.sql
+
+      - name: Run the example scripts
+        run: |
+          for script in sql/vedant_example.sql sql/janhavi_example.sql sql/pranesh_example.sql; do
+            echo "::group::$script"
+            $CLIENT < "$script"
+            echo "::endgroup::"
+          done
+
+      - name: Run the aggregate function tests
+        run: $CLIENT < sql/test_aggregates.sql
