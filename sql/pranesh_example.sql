@@ -9,12 +9,13 @@
 -- and a plain AVG() land. Harmonic mean is not claimed to be the "right"
 -- answer for distances; it is shown for comparison only.
 --
--- Prerequisite (run once, outside this script):
+-- Prerequisite (run once, outside this script) -- see the Setup section of
+-- the repository README for the exact commands on each platform:
 --   1. git clone https://github.com/mariadb/openflights
---   2. From inside that folder: load create.sql then load-data.sql
---      (see README/AI_USE_LOG for the exact commands used)
---   3. Create the shared view `route_distances` in flightdb2 (see
---      docs/reading_summary.md or team brief for the CREATE VIEW statement)
+--   2. From inside that folder, load sql/create.sql then sql/load-data.sql
+--      (the latter needs --local-infile=1, or it silently loads nothing)
+--   3. Run setup_dataset.sql from this directory, which creates the shared
+--      `route_distances` view that every example here builds on
 --
 -- Gotcha: exactly one route in route_distances has km = 0 (its two
 -- endpoint airports share coordinates). 1/km is undefined at 0, so every
