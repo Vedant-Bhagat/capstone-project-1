@@ -1,20 +1,28 @@
 -- Starter: Custom Aggregate Functions (MariaDB-only feature)
--- HARMONIC_MEAN: the correct way to average speeds over equal distances.
+-- HARMONIC_MEAN on real data: MariaDB Foundation's OpenFlights dataset
+-- (https://github.com/mariadb/openflights), database flightdb2.
+--
+-- Harmonic mean is the correct average for RATES (see the earlier speed
+-- example this replaces). Route distance is not a rate -- we compute it
+-- here anyway so a reader can see, on identical real data, how far apart
+-- the harmonic mean, the inline formula, a window-function equivalent,
+-- and a plain AVG() land. Harmonic mean is not claimed to be the "right"
+-- answer for distances; it is shown for comparison only.
+--
+-- Prerequisite (run once, outside this script):
+--   1. git clone https://github.com/mariadb/openflights
+--   2. From inside that folder: load create.sql then load-data.sql
+--      (see README/AI_USE_LOG for the exact commands used)
+--   3. Create the shared view `route_distances` in flightdb2 (see
+--      docs/reading_summary.md or team brief for the CREATE VIEW statement)
+--
+-- Gotcha: exactly one route in route_distances has km = 0 (its two
+-- endpoint airports share coordinates). 1/km is undefined at 0, so every
+-- query below filters WHERE km > 0.
+--
 -- How to run (from the sql directory): Get-Content pranesh_example.sql | mariadb -u root
 
-DROP DATABASE IF EXISTS capstone_demo_pranesh;
-CREATE DATABASE capstone_demo_pranesh;
-USE capstone_demo_pranesh;
-
-CREATE TABLE trip_legs (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    trip_name VARCHAR(30) NOT NULL,
-    speed_kmh DOUBLE NOT NULL   -- each leg covers the same distance
-);
-
-INSERT INTO trip_legs (trip_name, speed_kmh) VALUES
-    ('Bengaluru-Mysuru', 45), ('Bengaluru-Mysuru', 75), ('Bengaluru-Mysuru', 90),
-    ('Airport run', 25), ('Airport run', 100), ('Airport run', 55);
+USE flightdb2;
 
 DROP FUNCTION IF EXISTS HARMONIC_MEAN;
 
@@ -44,19 +52,43 @@ END //
 
 DELIMITER ;
 
-SELECT '--- Option A: custom aggregate function ---' AS label;
-SELECT trip_name, HARMONIC_MEAN(speed_kmh) AS avg_speed
-FROM trip_legs
-GROUP BY trip_name;
+SELECT '--- Option A: custom aggregate function (HARMONIC_MEAN) ---' AS label;
+SELECT airline, COUNT(*) AS routes, HARMONIC_MEAN(km) AS harmonic_km
+FROM route_distances
+WHERE km > 0
+GROUP BY airline
+HAVING routes >= 100
+ORDER BY routes DESC
+LIMIT 15;
 
 SELECT '--- Option B: inline COUNT(*) / SUM(1/x) at the call site ---' AS label;
-SELECT trip_name, COUNT(*) / SUM(1 / speed_kmh) AS avg_speed
-FROM trip_legs
-GROUP BY trip_name;
+SELECT airline, COUNT(*) AS routes, COUNT(*) / SUM(1 / km) AS harmonic_km
+FROM route_distances
+WHERE km > 0
+GROUP BY airline
+HAVING routes >= 100
+ORDER BY routes DESC
+LIMIT 15;
 
-SELECT '--- Option C: plain AVG() gives the WRONG answer for speeds ---' AS label;
-SELECT trip_name, AVG(speed_kmh) AS wrong_avg_speed
-FROM trip_legs
-GROUP BY trip_name;
+SELECT '--- Option C: window-function equivalent (OVER(), no GROUP BY collapse) ---' AS label;
+SELECT DISTINCT airline,
+       COUNT(*) OVER (PARTITION BY airline) AS routes,
+       COUNT(*) OVER (PARTITION BY airline) / SUM(1 / km) OVER (PARTITION BY airline) AS harmonic_km_window
+FROM route_distances
+WHERE km > 0
+ORDER BY routes DESC
+LIMIT 15;
 
--- Limits: x must be non-zero (1/x fails at 0), and results are floating-point.
+SELECT '--- Option D: plain AVG() -- NOT the right tool here, shown for contrast ---' AS label;
+SELECT airline, COUNT(*) AS routes, AVG(km) AS plain_avg_km
+FROM route_distances
+WHERE km > 0
+GROUP BY airline
+HAVING routes >= 100
+ORDER BY routes DESC
+LIMIT 15;
+
+-- Limits: x must be non-zero (see the km = 0 gotcha above); results are
+-- floating-point; harmonic mean is the correct average for rates (like
+-- our earlier speed example), not for distances -- it is shown here
+-- purely as a like-for-like comparison against the same real dataset.
