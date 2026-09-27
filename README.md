@@ -72,6 +72,11 @@ On Windows the client may not be on your `PATH`; use the full path instead, adju
 & "C:\Program Files\MariaDB 12.3\bin\mariadb.exe" -u root -e "SELECT VERSION();"
 ```
 
+If you already run MySQL, it is probably holding port 3306 and MariaDB will not start on it. Run MariaDB on another port and pass it to every command below:
+```bash
+mariadb -u root -P 3307 --protocol=tcp -e "SELECT VERSION();"
+```
+
 ### 2. Load the OpenFlights data
 
 ```bash
@@ -119,6 +124,26 @@ Each aggregate answers "how long is a typical route for this airline?" in a diff
 | British Airways (BA) | 547 | 3,310.0 km | 1,940.8 km | 1,062.7 km |
 
 American Airlines is the clearest case: the arithmetic mean says 2,310 km, the geometric mean says 1,397 km. Same 2,352 routes. The arithmetic mean is being dragged upward by a handful of intercontinental flights; the geometric mean describes what a typical American route actually looks like. Ryanair, flying a dense short-haul European network with no long tail, shows the three means clustered much closer together — the shape of the distribution is visible in how far apart they sit.
+
+### Weighting changes the answer more than the choice of mean does
+
+`WEIGHTED_AVERAGE(value, weight)` takes two arguments, which no built-in aggregate can express. It answers: how long is a typical route for a country's airlines, weighted by how many routes each airline actually flies?
+
+| Country | Airlines | Routes | Weighted | Unweighted |
+|---|---|---|---|---|
+| United States | 51 | 12,831 | 1,977.7 km | 957.4 km |
+| Germany | 11 | 2,920 | 2,236.8 km | 1,490.4 km |
+| Ireland | 4 | 2,760 | 1,484.4 km | 1,013.6 km |
+| China | 16 | 7,194 | 1,424.2 km | 1,142.5 km |
+| France | 15 | 2,013 | 2,217.4 km | 2,082.6 km |
+
+The United States more than doubles. Fifty-one US airlines are counted, and most are small regional carriers flying short hops; unweighted, each counts as much as Delta. France barely moves, because its carriers are more uniform in size. The gap between the two columns is a measure of how lopsided a country's airline industry is — which is not a question you set out to ask, and is the sort of thing a weighted aggregate makes cheap to notice.
+
+### Real data does not join the way the schema suggests
+
+`routes.airline` holds a two-letter IATA code, and joining it to `airlines.iata` looks like the obvious way to attribute a route to a carrier. It is wrong. IATA codes are not unique in that table — code `1I` alone belongs to seven airlines — so the join inflates 66,770 routes into **76,277 rows**, silently double-counting some airlines and attributing their routes to several countries at once.
+
+The numeric `airlines.alid` is the real key. Joining on it gives 66,315 rows; the remaining 455 routes carry no airline id and drop out, which we state rather than hide. Nothing about this is visible in the row counts unless you check, and no error is ever raised.
 
 ### The custom aggregate is slower than writing the formula out
 
