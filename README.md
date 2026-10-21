@@ -19,6 +19,15 @@ This repository implements three such aggregates against a real dataset, compare
 
 **Capstone Project I**, Constructor University, in partnership with the MariaDB Foundation.
 
+## Our other project
+
+This is the **starter**. Our **main dish** — area 4, "Vector search and RAG, natively" — is a separate
+repository: **https://github.com/Vedant-Bhagat/capstone-project-1-primary**
+
+The two are separate because the project page asks you to pick one area and declare it on the first line of
+your README, and whichever area a README declares is the only one assessed. One README cannot truthfully
+declare two areas.
+
 ## Team
 
 | Name | GitHub |

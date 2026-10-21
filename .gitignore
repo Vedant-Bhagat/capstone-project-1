@@ -25,3 +25,8 @@ docs/CONTRIBUTOR_SETUP.md
 
 # Local working notes, not part of the submission.
 TEAM_BRIEF_openflights.md
+
+# Main-dish repository, cloned here as a sibling working folder so both
+# projects share one workspace. It is its own git repository with its own
+# remote (capstone-project-1-primary) and must not be tracked by this one.
+primary/
