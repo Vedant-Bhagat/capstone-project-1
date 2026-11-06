@@ -72,12 +72,52 @@ SELECT IF(@amgm_violations = 0,
           CONCAT('FAIL: ', @amgm_violations, ' violations')) AS '';
 
 -- ---------------------------------------------------------------------------
+-- Test 4: HARMONIC_MEAN agrees with COUNT(*) / SUM(1/x)
+-- ---------------------------------------------------------------------------
+SELECT 'Test 4: HARMONIC_MEAN vs COUNT(*) / SUM(1/x)' AS '';
+
+SELECT COUNT(*) INTO @hm_failures
+FROM (SELECT airline,
+             HARMONIC_MEAN(km)      AS custom,
+             COUNT(*) / SUM(1 / km) AS closed_form
+      FROM route_distances
+      WHERE km > 0
+      GROUP BY airline) t
+WHERE ABS(custom - closed_form) / closed_form > @tolerance;
+
+SELECT IF(@hm_failures = 0,
+          'PASS: all airlines agree',
+          CONCAT('FAIL: ', @hm_failures, ' airlines disagree')) AS '';
+
+-- ---------------------------------------------------------------------------
+-- Test 5: the harmonic mean never exceeds the geometric mean
+-- ---------------------------------------------------------------------------
+-- Test 3 asserts GM <= AM; this completes the chain HM <= GM <= AM, which
+-- holds for any set of positive reals. Like Test 3 it depends on no dataset,
+-- so it catches errors the closed-form comparison in Test 4 cannot.
+SELECT 'Test 5: HM <= GM holds for every airline' AS '';
+
+SELECT COUNT(*) INTO @hmgm_violations
+FROM (SELECT airline,
+             HARMONIC_MEAN(km)  AS harm,
+             GEOMETRIC_MEAN(km) AS geo
+      FROM route_distances
+      WHERE km > 0
+      GROUP BY airline) t
+WHERE harm > geo * (1 + @tolerance);
+
+SELECT IF(@hmgm_violations = 0,
+          'PASS: HM <= GM holds everywhere',
+          CONCAT('FAIL: ', @hmgm_violations, ' violations')) AS '';
+
+-- ---------------------------------------------------------------------------
 -- Fail the run if anything above failed
 -- ---------------------------------------------------------------------------
 -- SIGNAL makes the client exit non-zero, which is what CI checks. Without it
 -- a failing test would print "FAIL" and the build would still go green.
 
-SET @total_failures = @failures + @amgm_violations + IF(@empty_result IS NULL, 0, 1);
+SET @total_failures = @failures + @amgm_violations + IF(@empty_result IS NULL, 0, 1)
+                    + @hm_failures + @hmgm_violations;
 
 DELIMITER //
 BEGIN NOT ATOMIC
