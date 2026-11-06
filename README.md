@@ -112,11 +112,14 @@ mariadb -u root < setup_dataset.sql     # creates the route_distances view
 mariadb -u root < vedant_example.sql    # GEOMETRIC_MEAN
 mariadb -u root < janhavi_example.sql   # WEIGHTED_AVERAGE
 mariadb -u root < pranesh_example.sql   # HARMONIC_MEAN
+mariadb -u root < median_buffered.sql   # MEDIAN_AGG, the buffering one
+mariadb -u root < test_fixture.sql      # controlled rows for the edge cases
 mariadb -u root < test_aggregates.sql   # tests
+mariadb -u root < test_median.sql       # tests for MEDIAN_AGG
 mariadb -u root < bench.sql             # timings
 ```
 
-Every script is idempotent — re-running one drops and recreates what it owns, so you can run them in any order, repeatedly.
+Every script is idempotent — re-running one drops and recreates what it owns, so you can run them in any order, repeatedly. The two test scripts are the exception to "any order": `test_median.sql` needs `median_buffered.sql` and `test_fixture.sql` to have run first.
 
 ## What we found
 
@@ -170,10 +173,53 @@ Ten runs each over all 66,770 routes, measured by `sql/bench.sql`:
 
 So the case for a custom aggregate is not performance. It is that `GEOMETRIC_MEAN(km)` is one call site that cannot be got wrong, versus a formula every caller has to know, repeat correctly, and guard against a zero. On a 66,000-row analytical query taking a third of a second, we would take the readability. On a hot path, we would not — and you should measure before assuming.
 
+### A median is where the feature runs out
+
+The three aggregates above are *streaming*: each row is folded into a running total and forgotten. A median cannot work that way — you cannot know which value is in the middle until you have seen them all — so the function has to keep the group somewhere. [`sql/median_buffered.sql`](sql/median_buffered.sql) does exactly that, in a `TEMPORARY` table created inside the function body, and it is the most interesting thing in this repository for four reasons.
+
+**It works, and it agrees with the built-in.** `MEDIAN_AGG(km)` matches MariaDB's own `MEDIAN()` on all 566 airlines to within floating-point tolerance, and on every hand-checked edge case. Asserted in [`sql/test_median.sql`](sql/test_median.sql).
+
+**It is the wrong choice anyway.** Same data, same server, best of three runs:
+
+| Approach | Time |
+|---|---|
+| Custom aggregate `MEDIAN_AGG(km)` | 1,460 ms |
+| Built-in `MEDIAN(km) OVER (PARTITION BY airline)` | 250 ms |
+| `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY km)` | 265 ms |
+| `ROW_NUMBER()`, pick the middle row(s) by hand | 295 ms |
+
+About 5x slower than all three alternatives, one of which is a built-in. Varying the group count over the same 66,771 rows — 1 group 1,365 ms, 566 groups 1,460 ms, 5,000 groups 2,140 ms — puts the cost at roughly 0.02 ms per row buffered against 0.16 ms per group, so it is the one `INSERT` per row that dominates, not the per-group setup. We had assumed the opposite before measuring.
+
+**The obvious implementation is quietly broken.** A fixed-name temporary table passes every test that calls the function once, and fails the moment you call it twice in one statement:
+
+```
+SELECT grp, MEDIAN_AGG(v), MEDIAN_AGG(v * 10) FROM t GROUP BY grp;
+ERROR 1146 (42S02): Table 'flightdb2.median_buf' doesn't exist
+```
+
+The two invocations interleave and the second one's `DROP` takes the first one's buffer away mid-fill. The natural fix — a unique table name per invocation — is not available, because that needs `PREPARE` and prepared statements are not allowed inside a stored function. So the buffer has to be shared and every row tagged with an invocation counter instead. Test 7 in `test_median.sql` is the regression test for it.
+
+**The server does not promise to finish an invocation.** This is the finding we would not have reached without buffering. In this shape:
+
+```sql
+SELECT COUNT(*) FROM (SELECT airline, MEDIAN_AGG(km) AS med,
+                             MIN(km) AS lo, MAX(km) AS hi
+                      FROM route_distances WHERE km > 0 GROUP BY airline) t
+ WHERE med < lo OR med > hi;
+```
+
+the derived table is merged and the outer condition pushed down into the grouping — and afterwards the buffer holds exactly one row per group, 566 of them. The medians are still correct. What happens is that a second invocation per group is started, fed a single row, and abandoned before the body reaches its cleanup, so the function's own `DELETE` never runs. Adding a `LIMIT` to the derived table blocks the merge and the leak disappears.
+
+A streaming aggregate could never show this, because it holds no state outside its own variables. Nothing in the documentation says an aggregate body runs to completion, and it turns out not to. `test_median.sql` prints the number rather than asserting it, so the CI log shows it per server version instead of a test breaking when a version behaves differently.
+
+Two smaller restrictions found along the way: a stored aggregate cannot appear in `HAVING` (`HAVING AVG(km) > 0` is fine, `HAVING MEDIAN_AGG(km) > 0` is `ERROR 1054: Unknown column 'km'`), and the built-in `MEDIAN()` will not accept a named `WINDOW w AS (...)` clause although `AVG()` in the same statement will — the percentile family wants its window spelled out inline.
+
 ### What the feature will not do
 
 - **A custom aggregate cannot be used as a window function.** There is no `GEOMETRIC_MEAN(km) OVER (PARTITION BY airline)`. This is why Option C in each example has to spell the formula out rather than reuse the function, and it is the sharpest limit we hit.
-- **`FETCH GROUP NEXT ROW` is single-pass.** The loop sees each row once and cannot rewind, so a median — which needs to know the values before it can pick the middle one — has to buffer the group itself.
+- **`FETCH GROUP NEXT ROW` is single-pass.** The loop sees each row once and cannot rewind, so a median — which needs to know the values before it can pick the middle one — has to buffer the group itself. We did that in [`sql/median_buffered.sql`](sql/median_buffered.sql); see *A median is where the feature runs out* above for what buffering costs and what it exposes.
+- **A stored aggregate cannot be used in `HAVING`.** The column name does not resolve there, so filtering on the result needs a derived table or a subquery.
+- **An aggregate body is not guaranteed to run to completion.** The optimizer can start an invocation and abandon it, which is invisible for a streaming aggregate and leaks state for a buffering one.
 - **Non-positive values fail silently.** `LN(0)` returns `NULL` rather than raising, and `AVG()` skips `NULL`s. The dataset contains exactly one zero-length route, and it does not produce an error anywhere. What it does produce is a wrong count: `COUNT(*)` still counts the row that contributed nothing, so an unguarded query reports a mean over 23 routes that was computed from 22. Every query here filters `WHERE km > 0` for that reason, and `sql/vedant_example.sql` demonstrates it.
 
 ## Repository layout
@@ -183,7 +229,10 @@ sql/setup_dataset.sql      the route_distances view every example builds on
 sql/vedant_example.sql     GEOMETRIC_MEAN, plus the limits investigation
 sql/janhavi_example.sql    WEIGHTED_AVERAGE, a two-argument aggregate
 sql/pranesh_example.sql    HARMONIC_MEAN
+sql/median_buffered.sql    MEDIAN_AGG: buffers the group, and what that costs
+sql/test_fixture.sql       controlled NULL/negative/tie rows the real data lacks
 sql/test_aggregates.sql    tests; exits non-zero on failure, gating CI
+sql/test_median.sql        tests for MEDIAN_AGG, same gate
 sql/bench.sql              timing harness, 10 runs per variant with variance
 .github/workflows/ci.yml   loads the dataset and runs all of the above
 docs/                      reading summary, project shortlist
