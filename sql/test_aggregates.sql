@@ -7,6 +7,7 @@
 --
 -- Prerequisites: setup_dataset.sql, then the example scripts that define the
 -- functions being tested.
+-- test_fixture.sql must also run first: the edge-case tests read agg_edge_cases.
 --
 -- How to run:
 --   Linux/macOS:  mariadb -u root < test_aggregates.sql
@@ -111,13 +112,40 @@ SELECT IF(@hmgm_violations = 0,
           CONCAT('FAIL: ', @hmgm_violations, ' violations')) AS '';
 
 -- ---------------------------------------------------------------------------
+-- Test 6: N identical values have a harmonic mean equal to that value
+-- ---------------------------------------------------------------------------
+-- The "tie" case: three copies of 7 must give exactly 7.
+SELECT 'Test 6: HARMONIC_MEAN of identical values' AS '';
+
+SELECT HARMONIC_MEAN(val) INTO @hm_ties
+FROM agg_edge_cases WHERE grp = 'ties';
+
+SELECT IF(@hm_ties <=> 7,
+          'PASS: three 7s give 7',
+          CONCAT('FAIL: three 7s gave ', IFNULL(@hm_ties, 'NULL'))) AS '';
+
+-- ---------------------------------------------------------------------------
+-- Test 7: an empty group returns NULL
+-- ---------------------------------------------------------------------------
+-- Covers the function's IF cnt = 0 branch.
+SELECT 'Test 7: HARMONIC_MEAN of an empty group returns NULL' AS '';
+
+SELECT HARMONIC_MEAN(km) INTO @hm_empty
+FROM route_distances WHERE km > 0 AND airline = '--no-such-airline--';
+
+SELECT IF(@hm_empty IS NULL,
+          'PASS: empty group is NULL',
+          CONCAT('FAIL: empty group returned ', @hm_empty)) AS '';
+
+-- ---------------------------------------------------------------------------
 -- Fail the run if anything above failed
 -- ---------------------------------------------------------------------------
 -- SIGNAL makes the client exit non-zero, which is what CI checks. Without it
 -- a failing test would print "FAIL" and the build would still go green.
 
 SET @total_failures = @failures + @amgm_violations + IF(@empty_result IS NULL, 0, 1)
-                    + @hm_failures + @hmgm_violations;
+                    + @hm_failures + @hmgm_violations
+                    + IF(@hm_ties <=> 7, 0, 1) + IF(@hm_empty IS NULL, 0, 1);
 
 DELIMITER //
 BEGIN NOT ATOMIC
