@@ -26,6 +26,10 @@ docs/CONTRIBUTOR_SETUP.md
 # Local working notes, not part of the submission.
 TEAM_BRIEF_openflights.md
 
+# The slide deck is for the presentation, not part of the submitted work, and
+# it is 728 KB a reader has no use for. Kept locally, untracked.
+MariaDB presentation -- Capstone Project I.docx
+
 # The main-dish repository is a sibling folder, not nested inside this one:
 #   todo/capstone-project-1/          <- this repository
 #   todo/capstone-project-1-primary/  <- the main dish (area 4)

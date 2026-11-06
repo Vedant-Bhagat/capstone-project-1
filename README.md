@@ -1,4 +1,4 @@
-A project for area 2, "Custom Aggregate Functions in SQL" for the MariaDB student database projects, 2026-09
+A project for area 2, "Custom Aggregate Functions in SQL", of the MariaDB student database projects, 2026-09: https://mariadb.org/bachelor_hackathon_2026-09/
 
 # Golden Record — Custom Aggregate Functions in MariaDB
 
