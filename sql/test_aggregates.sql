@@ -138,6 +138,108 @@ SELECT IF(@hm_empty IS NULL,
           CONCAT('FAIL: empty group returned ', @hm_empty)) AS '';
 
 -- ---------------------------------------------------------------------------
+-- Test 8: a zero value makes the group NULL
+-- ---------------------------------------------------------------------------
+-- 1/0 is undefined. The function guards it, so this holds whatever the
+-- sql_mode rather than raising error 1365 under ERROR_FOR_DIVISION_BY_ZERO.
+SELECT 'Test 8: HARMONIC_MEAN with a zero value returns NULL' AS '';
+
+SELECT HARMONIC_MEAN(val) INTO @hm_zero
+FROM agg_edge_cases WHERE grp = 'zero_val';
+
+SELECT IF(@hm_zero IS NULL,
+          'PASS: zero value gives NULL',
+          CONCAT('FAIL: zero value gave ', @hm_zero)) AS '';
+
+-- ---------------------------------------------------------------------------
+-- Test 9: reciprocals that cancel make the group NULL
+-- ---------------------------------------------------------------------------
+-- 1/1 + 1/-1 = 0, so the count is fine but the denominator is zero; the
+-- function's inv_sum = 0 guard returns NULL instead of dividing by it.
+--
+-- Negative inputs are outside the harmonic mean's domain (positive reals).
+-- They are unguarded by design and pass through as the plain formula result:
+-- 2 / (1/-10 + 1/20) = -40. Asserted so that any change to that is deliberate.
+SELECT 'Test 9: cancelling reciprocals return NULL; negatives pass through' AS '';
+
+SELECT HARMONIC_MEAN(val) INTO @hm_cancel
+FROM agg_edge_cases WHERE grp = 'cancel';
+
+SELECT HARMONIC_MEAN(val) INTO @hm_neg
+FROM agg_edge_cases WHERE grp = 'neg';
+
+SET @hm_cancel_failures = IF(@hm_cancel IS NULL, 0, 1)
+                        + IF(ABS(@hm_neg - (-40)) / 40 <= @tolerance, 0, 1);
+
+SELECT IF(@hm_cancel_failures = 0,
+          'PASS: cancel gives NULL, neg gives -40',
+          CONCAT('FAIL: cancel gave ', IFNULL(@hm_cancel, 'NULL'),
+                 ', neg gave ', IFNULL(@hm_neg, 'NULL'))) AS '';
+
+-- ---------------------------------------------------------------------------
+-- Test 10: text input
+-- ---------------------------------------------------------------------------
+-- a) Numeric strings coerce to the right DOUBLE. The two values come from a
+--    derived table, not a WHERE filter on agg_edge_cases: a filtered-out
+--    'abc' row there was observed to raise the conversion error on MariaDB
+--    13.0.2 (cause not yet established). The expected value
+--    uses e0 literals so it is computed in DOUBLE, not rounded DECIMAL.
+SELECT 'Test 10a: numeric strings coerce correctly' AS '';
+
+SELECT HARMONIC_MEAN(v) INTO @hm_text
+FROM (SELECT '12.5' AS v UNION ALL SELECT '20') t;
+
+SET @hm_text_expected = 2 / (1 / 12.5e0 + 1 / 20e0);
+
+SELECT IF(ABS(@hm_text - @hm_text_expected) / @hm_text_expected <= @tolerance,
+          'PASS: ''12.5'' and ''20'' coerce correctly',
+          CONCAT('FAIL: got ', IFNULL(@hm_text, 'NULL'),
+                 ', expected ', @hm_text_expected)) AS '';
+
+-- b) Junk text never produces a plausible wrong number. Strict sql_mode
+--    rejects 'abc' with error 1366 (SQLSTATE 22007), leaving @hm_junk at its
+--    preset NULL; non-strict converts it to 0 with a 22007 warning, and the
+--    zero guard returns NULL. Either is a non-answer and passes. A number is
+--    a failure. The handler keeps the script running in strict mode, but it
+--    also fires on the warning, so the pass condition is @hm_junk IS NULL
+--    alone: a 22007 warning alongside a number must still fail.
+SELECT 'Test 10b: junk text raises 22007 or returns NULL, never a number' AS '';
+
+SET @hm_junk = NULL;
+SET @hm_junk_raised = 0;
+
+DELIMITER //
+BEGIN NOT ATOMIC
+    DECLARE CONTINUE HANDLER FOR SQLSTATE '22007' SET @hm_junk_raised = 1;
+    SELECT HARMONIC_MEAN(val_text) INTO @hm_junk
+    FROM agg_edge_cases WHERE grp = 'text';
+END //
+DELIMITER ;
+
+SET @hm_junk_ok = (@hm_junk IS NULL);
+
+SELECT IF(@hm_junk_ok,
+          IF(@hm_junk_raised = 1, 'PASS: junk text gave no number (22007 signalled)',
+                                  'PASS: junk text gave NULL'),
+          CONCAT('FAIL: junk text gave ', @hm_junk)) AS '';
+
+-- ---------------------------------------------------------------------------
+-- Test 11: a NULL value makes the whole group NULL
+-- ---------------------------------------------------------------------------
+-- The NULL case the supervisor's feedback asked for, which the task doc's
+-- seven tests did not cover. 1/NULL is NULL, so inv_sum and the result go
+-- NULL. This differs from built-in AVG, which skips NULLs: AVG over 10, NULL,
+-- 30 is 20.
+SELECT 'Test 11: HARMONIC_MEAN with a NULL value returns NULL' AS '';
+
+SELECT HARMONIC_MEAN(val) INTO @hm_null
+FROM agg_edge_cases WHERE grp = 'has_null';
+
+SELECT IF(@hm_null IS NULL,
+          'PASS: NULL value gives NULL',
+          CONCAT('FAIL: NULL value gave ', @hm_null)) AS '';
+
+-- ---------------------------------------------------------------------------
 -- Fail the run if anything above failed
 -- ---------------------------------------------------------------------------
 -- SIGNAL makes the client exit non-zero, which is what CI checks. Without it
@@ -145,7 +247,10 @@ SELECT IF(@hm_empty IS NULL,
 
 SET @total_failures = @failures + @amgm_violations + IF(@empty_result IS NULL, 0, 1)
                     + @hm_failures + @hmgm_violations
-                    + IF(@hm_ties <=> 7, 0, 1) + IF(@hm_empty IS NULL, 0, 1);
+                    + IF(@hm_ties <=> 7, 0, 1) + IF(@hm_empty IS NULL, 0, 1)
+                    + IF(@hm_zero IS NULL, 0, 1) + @hm_cancel_failures
+                    + IF(ABS(@hm_text - @hm_text_expected) / @hm_text_expected <= @tolerance, 0, 1)
+                    + IF(@hm_junk_ok, 0, 1) + IF(@hm_null IS NULL, 0, 1);
 
 DELIMITER //
 BEGIN NOT ATOMIC
