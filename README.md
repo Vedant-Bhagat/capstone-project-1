@@ -170,6 +170,20 @@ Ten runs each over all 66,770 routes, measured by `sql/bench.sql`:
 
 So the case for a custom aggregate is not performance. It is that `GEOMETRIC_MEAN(km)` is one call site that cannot be got wrong, versus a formula every caller has to know, repeat correctly, and guard against a zero. On a 66,000-row analytical query taking a third of a second, we would take the readability. On a hot path, we would not — and you should measure before assuming.
 
+### `HARMONIC_MEAN` failed differently depending on how it was created
+
+The new edge-case tests in `sql/test_aggregates.sql` turned up a real defect. On a group containing a zero, or one whose reciprocals cancel to exactly zero (values 1 and −1), the function divided by zero, and what happened next depended on the `sql_mode` MariaDB stores with the function at `CREATE` time. Under the default `ERROR_FOR_DIVISION_BY_ZERO` the call raised error 1365. Without it, the same call quietly returned `NULL`. The existing `IF cnt = 0` guard cannot catch the cancelling case, because the count is fine and the *sum* is the problem. Vedant's task doc predicted that case before the test was written.
+
+The fix is two explicit guards that return `NULL` unconditionally. `NULL` was not a fresh choice: it is what the unguarded function already returned in non-strict mode, so the existing behaviour became unconditional rather than new behaviour being invented.
+
+The other awkward inputs are left alone, documented, and each pinned by a test:
+
+- **A `NULL` value makes the whole group `NULL`** (Test 11). Built-in `AVG()` behaves differently: it skips `NULL`s.
+- **Negative inputs pass through as the plain formula result** (Test 9): 2 / (1/−10 + 1/20) = −40. The harmonic mean is only defined for positive values, and the function does not police that.
+- **Junk text never produces a number** (Test 10). `'abc'` raises error 1366 in strict mode. In non-strict mode it becomes 0, which the zero guard turns into `NULL`. Numeric strings such as `'12.5'` convert correctly.
+
+One limit remains: the guard catches a reciprocal sum of *exactly* zero, and floating point rarely lands there. The values 2, 3 and −1.2 cancel mathematically (1/2 + 1/3 − 1/1.2 = 0), but in `DOUBLE` the sum comes out as −1.1 × 10⁻¹⁶, so `HARMONIC_MEAN` returns **−2.7 × 10¹⁶**, with no error and no warning. Fed the same three values in a different order, it returns −5.4 × 10¹⁶, so the answer depends on the order rows reach the function, which SQL does not guarantee. Positive inputs cannot get here, because their reciprocals never cancel. The problem only affects negative inputs, which the function already does not support.
+
 ### What the feature will not do
 
 - **A custom aggregate cannot be used as a window function.** There is no `GEOMETRIC_MEAN(km) OVER (PARTITION BY airline)`. This is why Option C in each example has to spell the formula out rather than reuse the function, and it is the sharpest limit we hit.
