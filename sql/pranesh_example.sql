@@ -21,6 +21,14 @@
 -- endpoint airports share coordinates). 1/km is undefined at 0, so every
 -- query below filters WHERE km > 0.
 --
+-- Guarantees: HARMONIC_MEAN never divides by zero, whatever the sql_mode.
+-- It returns NULL for a group that is empty, contains a zero value, or whose
+-- reciprocals sum to exactly zero (e.g. 1 and -1). Under the default
+-- ERROR_FOR_DIVISION_BY_ZERO mode the last two used to raise error 1365;
+-- NULL is what they already gave with that mode off. Callers should still
+-- filter km > 0 -- this only makes the failure mode predictable. NULL,
+-- negative and text inputs are not guarded and behave as MariaDB makes them.
+--
 -- How to run (from the sql directory): Get-Content pranesh_example.sql | mariadb -u root
 
 USE flightdb2;
@@ -33,6 +41,7 @@ CREATE AGGREGATE FUNCTION HARMONIC_MEAN(x DOUBLE) RETURNS DOUBLE
 BEGIN
     DECLARE inv_sum DOUBLE DEFAULT 0;
     DECLARE cnt INT DEFAULT 0;
+    DECLARE has_zero INT DEFAULT 0;
     DECLARE done INT DEFAULT 0;
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
 
@@ -41,11 +50,21 @@ BEGIN
         IF done THEN
             LEAVE main_loop;
         END IF;
-        SET inv_sum = inv_sum + (1 / x);
+        IF x = 0 THEN
+            SET has_zero = 1;
+        ELSE
+            SET inv_sum = inv_sum + (1 / x);
+        END IF;
         SET cnt = cnt + 1;
     END LOOP main_loop;
 
     IF cnt = 0 THEN
+        RETURN NULL;
+    END IF;
+    IF has_zero THEN
+        RETURN NULL;
+    END IF;
+    IF inv_sum = 0 THEN
         RETURN NULL;
     END IF;
     RETURN cnt / inv_sum;
