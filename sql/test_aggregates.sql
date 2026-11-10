@@ -196,32 +196,88 @@ SELECT IF(ABS(@hm_text - @hm_text_expected) / @hm_text_expected <= @tolerance,
           CONCAT('FAIL: got ', IFNULL(@hm_text, 'NULL'),
                  ', expected ', @hm_text_expected)) AS '';
 
--- b) Junk text never produces a plausible wrong number. Strict sql_mode
---    rejects 'abc' with error 1366 (SQLSTATE 22007), leaving @hm_junk at its
---    preset NULL; non-strict converts it to 0 with a 22007 warning, and the
---    zero guard returns NULL. Either is a non-answer and passes. A number is
---    a failure. The handler keeps the script running in strict mode, but it
---    also fires on the warning, so the pass condition is @hm_junk IS NULL
---    alone: a 22007 warning alongside a number must still fail.
-SELECT 'Test 10b: junk text raises 22007 or returns NULL, never a number' AS '';
+-- b) Junk text never produces a number, asserted separately in each mode.
+--    Converting 'abc' to the DOUBLE argument follows the caller's SESSION
+--    sql_mode, not the mode stored with the function, so each leg sets the
+--    session mode itself and the test does not depend on the server's
+--    defaults. The original mode is restored afterwards for later tests.
+--    A sentinel shows whether the statement completed: an error leaves
+--    @hm_junk untouched, a warning does not. The handler is for SQLEXCEPTION,
+--    which does not fire on the non-strict 1366 warning (a handler naming
+--    SQLSTATE '22007' would); it records every condition's errno so a failure
+--    message shows the full chain.
+SET @saved_sql_mode = @@SESSION.sql_mode;
 
-SET @hm_junk = NULL;
-SET @hm_junk_raised = 0;
+-- Strict: the conversion must fail with error 1366 before the function body
+-- runs, and nothing may be assigned. This leg checks MariaDB's conversion,
+-- not the function: it passes with or without the zero guard.
+SELECT 'Test 10b (strict): junk text raises error 1366' AS '';
+SET SESSION sql_mode = 'STRICT_ALL_TABLES';
+SET @hm_junk = 'not assigned';
+SET @hm_junk_errno = NULL;
 
 DELIMITER //
 BEGIN NOT ATOMIC
-    DECLARE CONTINUE HANDLER FOR SQLSTATE '22007' SET @hm_junk_raised = 1;
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+    BEGIN
+        DECLARE i INT DEFAULT 1;
+        DECLARE n INT;
+        DECLARE e INT;
+        GET DIAGNOSTICS n = NUMBER;
+        WHILE i <= n DO
+            GET DIAGNOSTICS CONDITION i e = MYSQL_ERRNO;
+            SET @hm_junk_errno = CONCAT_WS(',', @hm_junk_errno, e);
+            SET i = i + 1;
+        END WHILE;
+    END;
     SELECT HARMONIC_MEAN(val_text) INTO @hm_junk
     FROM agg_edge_cases WHERE grp = 'text';
 END //
 DELIMITER ;
 
-SET @hm_junk_ok = (@hm_junk IS NULL);
+SET @hm_junk_strict_ok = (@hm_junk_errno <=> '1366' AND @hm_junk <=> 'not assigned');
 
-SELECT IF(@hm_junk_ok,
-          IF(@hm_junk_raised = 1, 'PASS: junk text gave no number (22007 signalled)',
-                                  'PASS: junk text gave NULL'),
-          CONCAT('FAIL: junk text gave ', @hm_junk)) AS '';
+SELECT IF(@hm_junk_strict_ok,
+          'PASS: strict mode raised 1366, nothing assigned',
+          CONCAT('FAIL: conditions ', IFNULL(@hm_junk_errno, 'none'),
+                 ', result ', IFNULL(@hm_junk, 'NULL'))) AS '';
+
+-- Non-strict: 'abc' becomes 0 with warning 1366, reaches the body, and the
+-- zero guard must return NULL. The statement must complete (sentinel
+-- replaced) and the result must be NULL, not a number. This is the leg that
+-- exercises the guard.
+SELECT 'Test 10b (non-strict): junk text returns NULL via the zero guard' AS '';
+SET SESSION sql_mode = '';
+SET @hm_junk = 'not assigned';
+SET @hm_junk_errno = NULL;
+
+DELIMITER //
+BEGIN NOT ATOMIC
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+    BEGIN
+        DECLARE i INT DEFAULT 1;
+        DECLARE n INT;
+        DECLARE e INT;
+        GET DIAGNOSTICS n = NUMBER;
+        WHILE i <= n DO
+            GET DIAGNOSTICS CONDITION i e = MYSQL_ERRNO;
+            SET @hm_junk_errno = CONCAT_WS(',', @hm_junk_errno, e);
+            SET i = i + 1;
+        END WHILE;
+    END;
+    SELECT HARMONIC_MEAN(val_text) INTO @hm_junk
+    FROM agg_edge_cases WHERE grp = 'text';
+END //
+DELIMITER ;
+
+SET @hm_junk_loose_ok = (@hm_junk IS NULL);
+
+SELECT IF(@hm_junk_loose_ok,
+          'PASS: non-strict mode returned NULL',
+          CONCAT('FAIL: conditions ', IFNULL(@hm_junk_errno, 'none'),
+                 ', result ', IFNULL(@hm_junk, 'NULL'))) AS '';
+
+SET SESSION sql_mode = @saved_sql_mode;
 
 -- ---------------------------------------------------------------------------
 -- Test 11: a NULL value makes the whole group NULL
@@ -250,7 +306,8 @@ SET @total_failures = @failures + @amgm_violations + IF(@empty_result IS NULL, 0
                     + IF(@hm_ties <=> 7, 0, 1) + IF(@hm_empty IS NULL, 0, 1)
                     + IF(@hm_zero IS NULL, 0, 1) + @hm_cancel_failures
                     + IF(ABS(@hm_text - @hm_text_expected) / @hm_text_expected <= @tolerance, 0, 1)
-                    + IF(@hm_junk_ok, 0, 1) + IF(@hm_null IS NULL, 0, 1);
+                    + IF(@hm_junk_strict_ok, 0, 1) + IF(@hm_junk_loose_ok, 0, 1)
+                    + IF(@hm_null IS NULL, 0, 1);
 
 DELIMITER //
 BEGIN NOT ATOMIC
