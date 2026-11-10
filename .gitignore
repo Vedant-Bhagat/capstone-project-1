@@ -35,3 +35,6 @@ MariaDB presentation -- Capstone Project I.docx
 #   todo/capstone-project-1-primary/  <- the main dish (area 4)
 # Nothing to ignore for it, but the layout is recorded here because both
 # projects share one working folder.
+
+# Claude Code personal settings -- machine-specific, not team configuration
+.claude/settings.local.json
