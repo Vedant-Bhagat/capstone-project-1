@@ -61,6 +61,9 @@ jobs:
       - name: Create the derived view
         run: $CLIENT < sql/setup_dataset.sql
 
+      - name: Load the edge-case test fixture
+        run: $CLIENT < sql/test_fixture.sql
+
       - name: Run the example scripts
         run: |
           for script in sql/vedant_example.sql sql/janhavi_example.sql sql/pranesh_example.sql; do
