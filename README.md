@@ -213,6 +213,19 @@ the derived table is merged and the outer condition pushed down into the groupin
 A streaming aggregate could never show this, because it holds no state outside its own variables. Nothing in the documentation says an aggregate body runs to completion, and it turns out not to. `test_median.sql` prints the number rather than asserting it, so the CI log shows it per server version instead of a test breaking when a version behaves differently.
 
 Two smaller restrictions found along the way: a stored aggregate cannot appear in `HAVING` (`HAVING AVG(km) > 0` is fine, `HAVING MEDIAN_AGG(km) > 0` is `ERROR 1054: Unknown column 'km'`), and the built-in `MEDIAN()` will not accept a named `WINDOW w AS (...)` clause although `AVG()` in the same statement will — the percentile family wants its window spelled out inline.
+### `HARMONIC_MEAN` failed differently depending on how it was created
+
+The new edge-case tests in `sql/test_aggregates.sql` turned up a real defect. On a group containing a zero, or one whose reciprocals cancel to exactly zero (values 1 and −1), the function divided by zero, and what happened next depended on the `sql_mode` MariaDB stores with the function at `CREATE` time. Under the default `ERROR_FOR_DIVISION_BY_ZERO` the call raised error 1365. Without it, the same call quietly returned `NULL`. The existing `IF cnt = 0` guard cannot catch the cancelling case, because the count is fine and the *sum* is the problem. Vedant's task doc predicted that case before the test was written.
+
+The fix is two explicit guards that return `NULL` unconditionally. `NULL` was not a fresh choice: it is what the unguarded function already returned in non-strict mode, so the existing behaviour became unconditional rather than new behaviour being invented.
+
+The other awkward inputs are left alone, documented, and each pinned by a test:
+
+- **A `NULL` value makes the whole group `NULL`** (Test 11). Built-in `AVG()` behaves differently: it skips `NULL`s.
+- **Negative inputs pass through as the plain formula result** (Test 9): 2 / (1/−10 + 1/20) = −40. The harmonic mean is only defined for positive values, and the function does not police that.
+- **Junk text never produces a number** (Test 10). `'abc'` raises error 1366 in strict mode. In non-strict mode it becomes 0, which the zero guard turns into `NULL`. Numeric strings such as `'12.5'` convert correctly.
+
+One limit remains: the guard catches a reciprocal sum of *exactly* zero, and floating point rarely lands there. The values 2, 3 and −1.2 cancel mathematically (1/2 + 1/3 − 1/1.2 = 0), but in `DOUBLE` the sum comes out as −1.1 × 10⁻¹⁶, so `HARMONIC_MEAN` returns **−2.7 × 10¹⁶**, with no error and no warning. Fed the same three values in a different order, it returns −5.4 × 10¹⁶, so the answer depends on the order rows reach the function, which SQL does not guarantee. Positive inputs cannot get here, because their reciprocals never cancel. The problem only affects negative inputs, which the function already does not support.
 
 ### What the feature will not do
 

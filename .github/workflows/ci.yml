@@ -61,7 +61,7 @@ jobs:
       - name: Create the derived view
         run: $CLIENT < sql/setup_dataset.sql
 
-      - name: Load the edge-case fixture
+      - name: Load the edge-case test fixture
         run: $CLIENT < sql/test_fixture.sql
 
       - name: Run the example scripts
