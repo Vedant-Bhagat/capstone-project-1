@@ -227,6 +227,64 @@ The other awkward inputs are left alone, documented, and each pinned by a test:
 
 One limit remains: the guard catches a reciprocal sum of *exactly* zero, and floating point rarely lands there. The values 2, 3 and −1.2 cancel mathematically (1/2 + 1/3 − 1/1.2 = 0), but in `DOUBLE` the sum comes out as −1.1 × 10⁻¹⁶, so `HARMONIC_MEAN` returns **−2.7 × 10¹⁶**, with no error and no warning. Fed the same three values in a different order, it returns −5.4 × 10¹⁶, so the answer depends on the order rows reach the function, which SQL does not guarantee. Positive inputs cannot get here, because their reciprocals never cancel. The problem only affects negative inputs, which the function already does not support.
 
+### `WEIGHTED_AVERAGE` cannot defend itself the way `HARMONIC_MEAN` can
+
+The weighted-average tests (Tests 12–18) found the same class of problem and no
+place to put a guard. `HARMONIC_MEAN` survives junk text because the text
+becomes 0 and 0 is already illegal for it. For a weighted average 0 is a
+perfectly legal value, so nothing distinguishes a real zero from a failed
+conversion.
+
+In a non-strict session, `WEIGHTED_AVERAGE(val, weight)` over the three rows
+`'12.5'`, `'20'` and `'abc'`, each with weight 1, returns **10.8333** —
+`(12.5 + 20 + 0) / 3`, with only warning 1366 to show for it.
+That is not `NULL` and not an error: it is a plausible-looking wrong number,
+and it is the one input shape where this function is worse off than the
+harmonic mean. Strict `sql_mode`, which every supported version uses by
+default, raises 1366 and is the whole defence. Test 18 asserts all three legs.
+
+Negative weights are the sharper edge. The function guards `weight_total = 0`,
+so weights that cancel exactly (2 and −2) return `NULL` (Test 17). Weights
+that *don't* cancel skip the guard entirely, and the result leaves the range of
+the inputs:
+
+| values | weights | result |
+|---|---|---|
+| 10, 20 | 2, −1 | **0** |
+| 10, 20 | 3, −2 | **−10** |
+
+A mean of 10 and 20 that returns 0 is not a degenerate case, it is a wrong
+answer, and no error or warning is raised. This is the same shape as the
+leftover hole in `HARMONIC_MEAN`'s guard above: a guard written for the exact
+boundary misses everything near it. The function documents that weights must be
+non-negative and does not enforce it.
+
+One more divergence worth knowing: a `NULL` value or a `NULL` weight makes the
+whole group `NULL` (Test 16), because `val * weight` is `NULL` and the running
+sum never recovers. The inline `SUM(v*w)/SUM(w)` written at the call site skips
+that row instead and returns a number. So the custom aggregate and the
+hand-written formula — Options A and B in
+[`sql/janhavi_example.sql`](sql/janhavi_example.sql) — are **not**
+interchangeable on data containing `NULL`s. They agree on this dataset only
+because the view they read cannot produce one.
+
+### A `SUM()` in a test can switch the test suite off
+
+Found while reviewing the weighted-average tests, and worth recording because it
+is a property of SQL rather than of our code. Two tests counted failures with
+`SUM(condition)` where the older tests use `COUNT(*) ... WHERE condition`. Those
+are not equivalent: `SUM()` over rows whose condition is entirely `NULL`
+returns `NULL`, not 0. The counters are added together into `@total_failures`,
+one `NULL` makes the whole sum `NULL`, and `IF(@total_failures > 0)` is then
+`NULL` rather than true — so the `SIGNAL` that fails the run never fires.
+
+Demonstrated with a `WEIGHTED_AVERAGE` that always returns `NULL`: four tests
+printed `FAIL`, each of which exits non-zero on its own, and the suite still
+printed `All tests passed` and exited 0. The gate was off for the whole file,
+not just the new tests. Each comparison is now written
+`(... <= @tolerance) IS NOT TRUE`, which is never `NULL` and counts a value
+that cannot be compared as a failure.
+
 ### What the feature will not do
 
 - **A custom aggregate cannot be used as a window function.** There is no `GEOMETRIC_MEAN(km) OVER (PARTITION BY airline)`. This is why Option C in each example has to spell the formula out rather than reuse the function, and it is the sharpest limit we hit.

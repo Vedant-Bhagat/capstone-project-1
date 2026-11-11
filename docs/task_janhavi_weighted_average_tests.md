@@ -114,11 +114,13 @@ non-zero. **A test suite you have never seen fail is not a test suite.**
 
 ## Done when
 
-- [ ] `sql/test_fixture.sql` exists (yours or Pranesh's)
-- [ ] Seven new tests in `sql/test_aggregates.sql`, all printing `PASS`
-- [ ] Every new counter included in `@total_failures`
-- [ ] You have watched the suite fail on purpose, then pass
-- [ ] CI is green on your PR
+**Done.** Closed by PR #8 (`janhavi/weighted-average-tests`), merged as `4b69977`. Seven tests delivered as Tests 12–18, with 18 split into three legs. CI green on 11.4, 12.3 and 13.0. One follow-up landed separately as `c08dea3`: Tests 12 and 14 counted failures with `SUM(cond)`, which is `NULL` rather than 0 when every comparison is `NULL`, and that `NULL` silenced the suite's `SIGNAL`. See the README section *A `SUM()` in a test can switch the test suite off*.
+
+- [x] `sql/test_fixture.sql` exists (yours or Pranesh's)
+- [x] Seven new tests in `sql/test_aggregates.sql`, all printing `PASS`
+- [x] Every new counter included in `@total_failures`
+- [x] You have watched the suite fail on purpose, then pass
+- [x] CI is green on your PR
 
 ## If a test genuinely fails
 

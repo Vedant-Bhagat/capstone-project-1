@@ -123,11 +123,13 @@ non-zero. **A test suite you have never seen fail is not a test suite.**
 
 ## Done when
 
-- [ ] `sql/test_fixture.sql` exists (yours or Janhavi's, with the `cancel` rows)
-- [ ] Seven new tests in `sql/test_aggregates.sql`, all printing `PASS`
-- [ ] Every new counter included in `@total_failures`
-- [ ] You have watched the suite fail on purpose, then pass
-- [ ] CI is green on your PR
+**Done.** Closed by PR #6 (`pranesh/harmonic-mean-tests`), merged as `2746f08`, and PR #7 (`pranesh/test-10b-modes`), merged as `e6d5093`. Seven tests asked for, eight delivered as Tests 4–11; PR #7 then split Test 10b into separate strict and non-strict legs after review found the strict leg passed only because the statement errored. CI green on 11.4, 12.3 and 13.0.
+
+- [x] `sql/test_fixture.sql` exists (yours or Janhavi's, with the `cancel` rows)
+- [x] Seven new tests in `sql/test_aggregates.sql`, all printing `PASS`
+- [x] Every new counter included in `@total_failures`
+- [x] You have watched the suite fail on purpose, then pass
+- [x] CI is green on your PR
 
 ## If a test genuinely fails
 
