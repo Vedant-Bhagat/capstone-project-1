@@ -307,9 +307,13 @@ SELECT IF(@hm_null IS NULL,
 -- ---------------------------------------------------------------------------
 -- The main correctness test, same shape as Test 1, over every country. The
 -- country count is checked too, so an empty join cannot pass vacuously.
+-- The comparison is written inverted (`<= @tolerance) IS NOT TRUE`) so that a
+-- country whose comparison cannot be evaluated -- a NULL `custom`, say -- counts
+-- as a failure. `SUM(x > y)` would be NULL if every row were NULL, and a NULL
+-- addend would make @total_failures NULL and silence the SIGNAL below.
 SELECT 'Test 12: WEIGHTED_AVERAGE vs SUM(v*w)/SUM(w)' AS '';
 
-SELECT COUNT(*), SUM(ABS(custom - closed_form) / closed_form > @tolerance)
+SELECT COUNT(*), SUM((ABS(custom - closed_form) / closed_form <= @tolerance) IS NOT TRUE)
   INTO @wa_countries, @wa_failures
 FROM (SELECT al.country,
              WEIGHTED_AVERAGE(x.mean_km, x.route_count)       AS custom,
@@ -351,7 +355,7 @@ SELECT IF(@wa_plain_ok,
 -- It goes back to route_distances, so it does not share code with Test 12.
 SELECT 'Test 14: WEIGHTED_AVERAGE of airline means == AVG(km) over all routes' AS '';
 
-SELECT COUNT(*), SUM(ABS(w.weighted - p.pooled) / p.pooled > @tolerance)
+SELECT COUNT(*), SUM((ABS(w.weighted - p.pooled) / p.pooled <= @tolerance) IS NOT TRUE)
   INTO @wa_pool_countries, @wa_pool_failures
 FROM (SELECT al.country, WEIGHTED_AVERAGE(x.mean_km, x.route_count) AS weighted
       FROM airline_route_stats x
