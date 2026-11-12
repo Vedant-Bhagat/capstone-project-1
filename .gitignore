@@ -23,9 +23,6 @@ team_guide.pdf
 # Contributor walkthrough kept local only -- shared directly, not committed.
 docs/CONTRIBUTOR_SETUP.md
 
-# Local working notes, not part of the submission.
-TEAM_BRIEF_openflights.md
-
 # The slide deck is for the presentation, not part of the submitted work, and
 # it is 728 KB a reader has no use for. Kept locally, untracked.
 MariaDB presentation -- Capstone Project I.docx
